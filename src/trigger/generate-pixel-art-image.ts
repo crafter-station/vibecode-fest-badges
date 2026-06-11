@@ -122,7 +122,6 @@ export const generatePixelArtImageTask = schemaTask({
       try {
         return await generateText({
           model: openai("gpt-5.5"),
-          maxRetries: 0,
           timeout: 5 * 60 * 1000,
           messages: [
             {
