@@ -59,7 +59,7 @@ export const processWhatsAppBadgeTask = schemaTask({
         .where(eq(whatsappConversations.id, conversationId));
 
       const imageCaption =
-        "Your VibeCode Fest badge is ready. Save it and share it with the crew.";
+        "Tu badge de VibeCode Fest ya está listo. Guárdalo y compártelo en Instagram, LinkedIn o X para que tus amigos también puedan venir.";
       const imageResponse = await sendWhatsAppImage({
         phoneNumberId,
         to: waId,
