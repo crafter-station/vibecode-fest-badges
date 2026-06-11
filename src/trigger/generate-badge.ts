@@ -2,14 +2,74 @@ import { randomUUID } from "node:crypto";
 import { logger, schemaTask } from "@trigger.dev/sdk/v3";
 import sharp from "sharp";
 import { z } from "zod";
-import { fontUrl, logoImageUrl, templateImageUrl } from "@/lib/contants";
+import { logoImageUrl, templateImageUrl } from "@/lib/contants";
 import {
   assertImageMedia,
-  escapeXml,
   generatedImageSize,
   loadMediaFromUrl,
   uploadImageToBlob,
 } from "./badge-utils";
+
+const badgeNumberGlyphs: Record<string, string[]> = {
+  "#": ["01010", "11111", "01010", "01010", "11111", "01010", "01010"],
+  "0": ["11111", "10001", "10011", "10101", "11001", "10001", "11111"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["11111", "00001", "00001", "11111", "10000", "10000", "11111"],
+  "3": ["11111", "00001", "00001", "01111", "00001", "00001", "11111"],
+  "4": ["10001", "10001", "10001", "11111", "00001", "00001", "00001"],
+  "5": ["11111", "10000", "10000", "11111", "00001", "00001", "11111"],
+  "6": ["11111", "10000", "10000", "11111", "10001", "10001", "11111"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["11111", "10001", "10001", "11111", "10001", "10001", "11111"],
+  "9": ["11111", "10001", "10001", "11111", "00001", "00001", "11111"],
+};
+
+export const createBadgeNumberOverlay = (badgeNumber: number) => {
+  const formattedBadgeNumber = `#${String(badgeNumber).padStart(4, "0")}`;
+  const glyphs = [...formattedBadgeNumber]
+    .map((character) => badgeNumberGlyphs[character])
+    .filter((glyph): glyph is string[] => Boolean(glyph));
+  const glyphWidth = 5;
+  const glyphHeight = 7;
+  const glyphGap = 1;
+  const overlayWidth = 230;
+  const overlayHeight = 80;
+  const totalColumns =
+    glyphs.length * glyphWidth + Math.max(glyphs.length - 1, 0) * glyphGap;
+  const cellSize = Math.floor(
+    Math.min(
+      (overlayWidth - 20) / totalColumns,
+      (overlayHeight - 18) / glyphHeight,
+    ),
+  );
+  const renderedWidth = totalColumns * cellSize;
+  const renderedHeight = glyphHeight * cellSize;
+  const startX = Math.round((overlayWidth - renderedWidth) / 2);
+  const startY = Math.round((overlayHeight - renderedHeight) / 2);
+  const rects = glyphs.flatMap((glyph, glyphIndex) =>
+    glyph.flatMap((row, rowIndex) =>
+      [...row]
+        .map((pixel, columnIndex) => {
+          if (pixel !== "1") {
+            return undefined;
+          }
+
+          const x =
+            startX +
+            (glyphIndex * (glyphWidth + glyphGap) + columnIndex) * cellSize;
+          const y = startY + rowIndex * cellSize;
+          return `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
+        })
+        .filter(Boolean),
+    ),
+  );
+
+  return Buffer.from(`
+<svg width="${overlayWidth}" height="${overlayHeight}" viewBox="0 0 ${overlayWidth} ${overlayHeight}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${overlayWidth}" height="${overlayHeight}" fill="#ffffff" />
+  ${rects.join("\n  ")}
+</svg>`);
+};
 
 export const generateBadgeTask = schemaTask({
   id: "generate-badge",
@@ -23,7 +83,6 @@ export const generateBadgeTask = schemaTask({
     const pixelArtImage = await loadMediaFromUrl(pixelArtImageUrl);
     const templateImage = await loadMediaFromUrl(templateImageUrl);
     const logoImage = await loadMediaFromUrl(logoImageUrl);
-    const font = await loadMediaFromUrl(fontUrl);
     assertImageMedia(pixelArtImage, "pixel art image URL");
     assertImageMedia(templateImage, "templateImageUrl");
     assertImageMedia(logoImage, "logoImageUrl");
@@ -43,24 +102,7 @@ export const generateBadgeTask = schemaTask({
       .png()
       .toBuffer();
 
-    const fontData = Buffer.from(font.uint8Array).toString("base64");
-    const formattedBadgeNumber = `#${String(badgeNumber).padStart(4, "0")}`;
-    const escapedBadgeNumber = escapeXml(formattedBadgeNumber);
-    const numberOverlay = Buffer.from(`
-<svg width="230" height="80" viewBox="0 0 230 80" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @font-face {
-      font-family: 'Tiny5';
-      src: url('data:font/truetype;base64,${fontData}') format('truetype');
-    }
-    text {
-      font-family: 'Tiny5';
-      font-size: 64px;
-    }
-  </style>
-  <rect x="0" y="0" width="230" height="80" fill="#ffffff" />
-  <text x="115" y="59" fill="#000000" text-anchor="middle">${escapedBadgeNumber}</text>
-</svg>`);
+    const numberOverlay = createBadgeNumberOverlay(badgeNumber);
 
     const badgeImage = await sharp(templateBuffer)
       .composite([
