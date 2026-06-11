@@ -17,6 +17,14 @@ export const generateProfileBadgeTask = schemaTask({
     if (!pixelArtResult.ok) {
       throw pixelArtResult.error;
     }
+    if ("rejectedImage" in pixelArtResult.output) {
+      return {
+        badgeNumber,
+        imageUrl,
+        rejectedImage: true,
+        reason: pixelArtResult.output.reason,
+      };
+    }
 
     const badgeResult = await generateBadgeTask.triggerAndWait({
       badgeNumber,

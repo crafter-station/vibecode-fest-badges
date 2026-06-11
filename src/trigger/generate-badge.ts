@@ -111,8 +111,8 @@ export const generateBadgeTask = schemaTask({
           left: Math.round((templateMetadata.width - generatedImageSize) / 2),
           top: Math.round((templateMetadata.height - generatedImageSize) / 2),
         },
-        { input: logoBuffer, left: 383, top: 356 },
-        { input: numberOverlay, left: 235, top: 895 },
+        { input: logoBuffer, left: 403, top: 236 },
+        { input: numberOverlay, left: 205, top: 925 },
       ])
       .png()
       .toBuffer();

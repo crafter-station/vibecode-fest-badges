@@ -1,15 +1,81 @@
 import { put } from "@vercel/blob";
 
 export const standaloneGeneratedImageSize = 1024;
-export const generatedImageSize = 636;
+export const generatedImageSize = 730;
 
 export type GeneratedMedia = {
   mediaType: string;
   uint8Array: Uint8Array;
 };
 
+export const collectErrorText = (error: unknown, depth = 0): string => {
+  if (depth > 4 || error === null || error === undefined) {
+    return "";
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    const errorWithDetails = error as Error & {
+      cause?: unknown;
+      data?: unknown;
+      errors?: unknown[];
+      lastError?: unknown;
+      responseBody?: unknown;
+      statusCode?: unknown;
+      url?: unknown;
+    };
+
+    return [
+      error.name,
+      error.message,
+      error.stack,
+      collectErrorText(errorWithDetails.cause, depth + 1),
+      collectErrorText(errorWithDetails.data, depth + 1),
+      collectErrorText(errorWithDetails.errors, depth + 1),
+      collectErrorText(errorWithDetails.lastError, depth + 1),
+      collectErrorText(errorWithDetails.responseBody, depth + 1),
+      collectErrorText(errorWithDetails.statusCode, depth + 1),
+      collectErrorText(errorWithDetails.url, depth + 1),
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (Array.isArray(error)) {
+    return error.map((item) => collectErrorText(item, depth + 1)).join("\n");
+  }
+
+  if (typeof error === "object") {
+    return Object.values(error)
+      .map((value) => collectErrorText(value, depth + 1))
+      .join("\n");
+  }
+
+  return String(error);
+};
+
+export const isOpenAIResponsesSocketCloseError = (error: unknown) => {
+  const errorText = collectErrorText(error).toLowerCase();
+
+  return (
+    (errorText.includes("other side closed") &&
+      errorText.includes("api.openai.com/v1/responses")) ||
+    (errorText.includes('"type": "image_generation_call"') &&
+      errorText.includes('"status": "failed"')) ||
+    (errorText.includes("image_generation_call") &&
+      errorText.includes("status") &&
+      errorText.includes("failed") &&
+      errorText.includes("couldn") &&
+      errorText.includes("generate the requested image"))
+  );
+};
+
 type UploadImageToBlobOptions = {
   buffer: Buffer;
+  contentType?: string;
   pathname: string;
 };
 
@@ -87,11 +153,12 @@ export const assertImageMedia = (media: GeneratedMedia, label: string) => {
 
 export const uploadImageToBlob = async ({
   buffer,
+  contentType = "image/png",
   pathname,
 }: UploadImageToBlobOptions): Promise<string> => {
   const blob = await put(pathname, buffer, {
     access: "public",
-    contentType: "image/png",
+    contentType,
     addRandomSuffix: true,
   });
 

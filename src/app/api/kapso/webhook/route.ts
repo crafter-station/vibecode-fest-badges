@@ -366,6 +366,9 @@ Use the full conversation history, the highlighted latest message, injected imag
         success: event.success,
       });
     },
+    experimental_telemetry: {
+      isEnabled: true,
+    },
   });
 
   const responseText = result.text.trim();

@@ -9,6 +9,7 @@
     "db:push": "drizzle-kit push",
     "generate:badge": "bun run scripts/generate-profile-animation.ts",
     "generate:profile-animation": "bun run scripts/generate-profile-animation.ts",
+    "hello:gpt": "bun run scripts/hello-gpt-55.ts",
     "lint": "biome check",
     "format": "biome format --write"
   },
