@@ -159,27 +159,45 @@ export const upsertConversationAndMessage = async (
   normalized: NormalizedWhatsAppMessage,
 ) => {
   const now = new Date();
-  const [conversation] = await db
-    .insert(whatsappConversations)
-    .values({
-      waId: normalized.waId,
-      phoneNumber: normalized.conversation.phone_number ?? normalized.waId,
-      phoneNumberId: normalized.phoneNumberId,
-      kapsoConversationId: normalized.conversation.id,
-      contactName: normalized.contactName,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: whatsappConversations.waId,
-      set: {
-        phoneNumber: normalized.conversation.phone_number ?? normalized.waId,
-        phoneNumberId: normalized.phoneNumberId,
-        kapsoConversationId: normalized.conversation.id,
-        contactName: normalized.contactName,
-        updatedAt: now,
-      },
-    })
+  const conversationValues = {
+    phoneNumber: normalized.conversation.phone_number ?? normalized.waId,
+    phoneNumberId: normalized.phoneNumberId,
+    kapsoConversationId: normalized.conversation.id,
+    contactName: normalized.contactName,
+    updatedAt: now,
+  };
+  const [updatedConversation] = await db
+    .update(whatsappConversations)
+    .set(conversationValues)
+    .where(eq(whatsappConversations.waId, normalized.waId))
     .returning();
+
+  let conversation = updatedConversation;
+
+  if (!conversation) {
+    const [insertedConversation] = await db
+      .insert(whatsappConversations)
+      .values({
+        ...conversationValues,
+        waId: normalized.waId,
+      })
+      .onConflictDoNothing({
+        target: whatsappConversations.waId,
+      })
+      .returning();
+
+    conversation = insertedConversation;
+
+    if (!conversation) {
+      const [conflictingConversation] = await db
+        .update(whatsappConversations)
+        .set(conversationValues)
+        .where(eq(whatsappConversations.waId, normalized.waId))
+        .returning();
+
+      conversation = conflictingConversation;
+    }
+  }
 
   if (!conversation) {
     throw new Error("Failed to upsert WhatsApp conversation");
