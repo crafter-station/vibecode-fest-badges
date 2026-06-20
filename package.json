@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "db:push": "drizzle-kit push",
+    "db:backfill:badges": "bun run scripts/backfill-canonical-badges.ts",
     "generate:badge": "bun run scripts/generate-profile-animation.ts",
     "generate:profile-animation": "bun run scripts/generate-profile-animation.ts",
     "generate:badges-video": "bun run scripts/generate-badges-video.ts",
