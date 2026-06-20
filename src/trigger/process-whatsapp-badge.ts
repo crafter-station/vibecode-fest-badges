@@ -4,6 +4,13 @@ import { z } from "zod";
 import { db } from "@/db";
 import { whatsappConversations } from "@/db/schema";
 import {
+  ensureWhatsAppBadge,
+  markBadgeFailed,
+  markBadgeGenerated,
+  markBadgeGenerating,
+  markBadgeRejected,
+} from "@/lib/badges";
+import {
   generateFailureReply,
   sendWhatsAppImage,
   sendWhatsAppText,
@@ -59,24 +66,21 @@ export const processWhatsAppBadgeTask = schemaTask({
     badgeNumber: z.number().int().nonnegative(),
     imageUrl: z.url(),
   }),
-  run: async ({
-    conversationId,
-    phoneNumberId,
-    waId,
-    badgeNumber,
-    imageUrl,
-  }) => {
+  run: async ({ conversationId, phoneNumberId, waId, imageUrl }) => {
+    const badge = await ensureWhatsAppBadge(conversationId);
+    await markBadgeGenerating({ badgeId: badge.id, sourceImageUrl: imageUrl });
+
     logger.log("WhatsApp badge processing started", {
       conversationId,
       phoneNumberId,
       waId,
-      badgeNumber,
+      badgeNumber: badge.badgeNumber,
       imageUrl,
     });
 
     try {
       const result = await generateProfileBadgeTask.triggerAndWait({
-        badgeNumber,
+        badgeNumber: badge.badgeNumber,
         imageUrl,
       });
 
@@ -85,6 +89,7 @@ export const processWhatsAppBadgeTask = schemaTask({
       }
       if ("rejectedImage" in result.output) {
         const reason = result.output.reason ?? "openai_responses_socket_closed";
+        await markBadgeRejected({ badgeId: badge.id, reason });
         await resetGenerationAndAskForNewImage({
           conversationId,
           phoneNumberId,
@@ -94,17 +99,25 @@ export const processWhatsAppBadgeTask = schemaTask({
 
         logger.log("WhatsApp badge image rejected", {
           conversationId,
-          badgeNumber,
+          badgeNumber: badge.badgeNumber,
           reason,
         });
 
         return result.output;
       }
 
+      await markBadgeGenerated({
+        badgeId: badge.id,
+        sourceImageUrl: imageUrl,
+        pixelArtImageUrl: result.output.pixelArtImageUrl,
+        badgeImageUrl: result.output.badgeImageUrl,
+      });
+
       await db
         .update(whatsappConversations)
         .set({
           badgeGenerated: true,
+          badgeNumber: badge.badgeNumber,
           pixelArtImageUrl: result.output.pixelArtImageUrl,
           badgeImageUrl: result.output.badgeImageUrl,
           generationError: null,
@@ -131,7 +144,7 @@ export const processWhatsAppBadgeTask = schemaTask({
 
       logger.log("WhatsApp badge processing completed", {
         conversationId,
-        badgeNumber,
+        badgeNumber: badge.badgeNumber,
         pixelArtImageUrl: result.output.pixelArtImageUrl,
         badgeImageUrl: result.output.badgeImageUrl,
       });
@@ -142,6 +155,7 @@ export const processWhatsAppBadgeTask = schemaTask({
       const shouldAskForNewImage = isOpenAIResponsesSocketCloseError(error);
 
       if (shouldAskForNewImage) {
+        await markBadgeRejected({ badgeId: badge.id, reason: message });
         await resetGenerationAndAskForNewImage({
           conversationId,
           phoneNumberId,
@@ -149,6 +163,7 @@ export const processWhatsAppBadgeTask = schemaTask({
           generationError: message,
         });
       } else {
+        await markBadgeFailed({ badgeId: badge.id, error: message });
         await db
           .update(whatsappConversations)
           .set({ generationError: message, updatedAt: new Date() })
@@ -157,7 +172,7 @@ export const processWhatsAppBadgeTask = schemaTask({
 
       logger.error("WhatsApp badge generation failed", {
         conversationId,
-        badgeNumber,
+        badgeNumber: badge.badgeNumber,
         error: message,
         shouldAskForNewImage,
       });

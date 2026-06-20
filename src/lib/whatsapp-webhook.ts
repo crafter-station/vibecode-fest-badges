@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { whatsappConversations, whatsappMessages } from "@/db/schema";
+import { ensureWhatsAppBadge } from "@/lib/badges";
 
 type WebhookPayload = Record<string, unknown>;
 
@@ -273,108 +274,10 @@ export const insertOutboundWhatsAppMessage = async ({
     .where(eq(whatsappConversations.id, conversationId));
 };
 
-const lowestAvailableBadgeNumber = async () => {
-  const assignedBadgeNumbers = await db
-    .select({ badgeNumber: whatsappConversations.badgeNumber })
-    .from(whatsappConversations)
-    .where(isNotNull(whatsappConversations.badgeNumber))
-    .orderBy(asc(whatsappConversations.badgeNumber));
-
-  let badgeNumber = 1;
-
-  for (const assigned of assignedBadgeNumbers) {
-    if (assigned.badgeNumber === null || assigned.badgeNumber < badgeNumber) {
-      continue;
-    }
-
-    if (assigned.badgeNumber > badgeNumber) {
-      break;
-    }
-
-    badgeNumber += 1;
-  }
-
-  return badgeNumber;
-};
-
-const isBadgeNumberConflict = (error: unknown) => {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const { code, constraint, message } = error as {
-    code?: string;
-    constraint?: string;
-    message?: string;
-  };
-
-  return (
-    code === "23505" ||
-    constraint === "whatsapp_conversations_badge_number_idx" ||
-    message?.includes("whatsapp_conversations_badge_number_idx") === true
-  );
-};
-
 export const ensureBadgeNumber = async (conversationId: number) => {
-  const [existingConversation] = await db
-    .select({ badgeNumber: whatsappConversations.badgeNumber })
-    .from(whatsappConversations)
-    .where(eq(whatsappConversations.id, conversationId))
-    .limit(1);
+  const badge = await ensureWhatsAppBadge(conversationId);
 
-  if (!existingConversation) {
-    throw new Error("Conversation not found");
-  }
-
-  if (existingConversation.badgeNumber !== null) {
-    return existingConversation.badgeNumber;
-  }
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const badgeNumber = await lowestAvailableBadgeNumber();
-
-    try {
-      const [conversation] = await db
-        .update(whatsappConversations)
-        .set({
-          badgeNumber,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(whatsappConversations.id, conversationId),
-            isNull(whatsappConversations.badgeNumber),
-          ),
-        )
-        .returning({ badgeNumber: whatsappConversations.badgeNumber });
-
-      if (
-        conversation?.badgeNumber !== null &&
-        conversation?.badgeNumber !== undefined
-      ) {
-        return conversation.badgeNumber;
-      }
-
-      const [updatedConversation] = await db
-        .select({ badgeNumber: whatsappConversations.badgeNumber })
-        .from(whatsappConversations)
-        .where(eq(whatsappConversations.id, conversationId))
-        .limit(1);
-
-      if (
-        updatedConversation?.badgeNumber !== null &&
-        updatedConversation?.badgeNumber !== undefined
-      ) {
-        return updatedConversation.badgeNumber;
-      }
-    } catch (error) {
-      if (!isBadgeNumberConflict(error) || attempt === 4) {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error("Failed to assign badge number");
+  return badge.badgeNumber;
 };
 
 export const claimBadgeGeneration = async ({

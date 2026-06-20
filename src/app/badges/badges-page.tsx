@@ -2,7 +2,7 @@ import { and, asc, count, eq, isNotNull } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { whatsappConversations } from "@/db/schema";
+import { badges as badgesTable, whatsappConversations } from "@/db/schema";
 import { BadgeSelectionGrid } from "./badge-selection-grid";
 
 const BADGES_PER_PAGE = 20;
@@ -12,9 +12,8 @@ type BadgesPageProps = {
 };
 
 const badgesWhere = and(
-  eq(whatsappConversations.badgeGenerated, true),
-  isNotNull(whatsappConversations.badgeImageUrl),
-  isNotNull(whatsappConversations.badgeNumber),
+  eq(badgesTable.generationStatus, "generated"),
+  isNotNull(badgesTable.badgeImageUrl),
 );
 
 const pageHref = (page: number) => (page === 1 ? "/badges" : `/badges/${page}`);
@@ -23,20 +22,21 @@ export async function BadgesPage({ page }: BadgesPageProps) {
   const offset = (page - 1) * BADGES_PER_PAGE;
 
   const [totalResult, badges] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(whatsappConversations)
-      .where(badgesWhere),
+    db.select({ value: count() }).from(badgesTable).where(badgesWhere),
     db
       .select({
-        id: whatsappConversations.id,
+        id: badgesTable.id,
         contactName: whatsappConversations.contactName,
-        badgeNumber: whatsappConversations.badgeNumber,
-        badgeImageUrl: whatsappConversations.badgeImageUrl,
+        badgeNumber: badgesTable.badgeNumber,
+        badgeImageUrl: badgesTable.badgeImageUrl,
       })
-      .from(whatsappConversations)
+      .from(badgesTable)
+      .leftJoin(
+        whatsappConversations,
+        eq(whatsappConversations.badgeId, badgesTable.id),
+      )
       .where(badgesWhere)
-      .orderBy(asc(whatsappConversations.badgeNumber))
+      .orderBy(asc(badgesTable.badgeNumber))
       .limit(BADGES_PER_PAGE)
       .offset(offset),
   ]);
