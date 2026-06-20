@@ -1,9 +1,9 @@
 import { and, asc, count, eq, isNotNull } from "drizzle-orm";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { whatsappConversations } from "@/db/schema";
+import { BadgeSelectionGrid } from "./badge-selection-grid";
 
 const BADGES_PER_PAGE = 20;
 
@@ -84,45 +84,7 @@ export async function BadgesPage({ page }: BadgesPageProps) {
             </p>
           </section>
         ) : (
-          <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {badges.map((badge) => (
-              <article
-                className="group overflow-hidden rounded-3xl border-4 border-stone-950 bg-white shadow-[7px_7px_0_#1c1917] transition-transform hover:-translate-y-1"
-                key={badge.id}
-              >
-                <div className="relative aspect-square bg-stone-200">
-                  <Image
-                    alt={`Badge #${String(badge.badgeNumber).padStart(4, "0")}`}
-                    className="h-full w-full object-cover"
-                    fill
-                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-                    src={badge.badgeImageUrl ?? ""}
-                    unoptimized
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-3 border-stone-950 border-t-4 p-4">
-                  <div>
-                    <p className="font-black text-2xl">
-                      #{String(badge.badgeNumber).padStart(4, "0")}
-                    </p>
-                    {badge.contactName ? (
-                      <p className="truncate text-sm text-stone-600">
-                        {badge.contactName}
-                      </p>
-                    ) : null}
-                  </div>
-                  <a
-                    className="rounded-full border-2 border-stone-950 px-3 py-1 font-bold text-xs uppercase tracking-widest transition-colors hover:bg-stone-950 hover:text-white"
-                    href={badge.badgeImageUrl ?? ""}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Open
-                  </a>
-                </div>
-              </article>
-            ))}
-          </section>
+          <BadgeSelectionGrid badges={badges} />
         )}
 
         {totalPages > 1 ? (

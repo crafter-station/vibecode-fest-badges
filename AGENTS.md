@@ -13,12 +13,13 @@ This repo uses Next.js `16.2.9`; APIs, conventions, and file structure may diffe
 - Format writes: `bun run format`.
 - Typecheck when needed: `bunx tsc --noEmit`; there is no `typecheck` script.
 - Database schema push: `bun run db:push` uses `drizzle.config.ts` and requires `DATABASE_URL`.
-- Local badge generation: `bun run generate:badge <number>` or `bun run generate:profile-animation <number>`. Add `--from-image=<path>` to skip OpenAI image generation and use an existing image.
+- `bun run generate:badge` and `bun run generate:profile-animation` currently point at missing `scripts/generate-profile-animation.ts`; do not rely on them until that script exists.
+- Badge wall video export is `bun run generate:badges-video`; it reads generated badge rows from `DATABASE_URL` and writes under `generated/badges-video` by default.
 - There is no test script or configured test runner in this repo.
 
 ## Environment
 
-- Server env is validated in `src/env.ts`; code importing it needs `BLOB_READ_WRITE_TOKEN`, `DATABASE_URL`, `KAPSO_API_KEY`, `KAPSO_WEBHOOK_SECRET`, and `OPENAI_API_KEY`.
+- Server env is validated in `src/env.ts`; code importing it needs `BLOB_READ_WRITE_TOKEN`, `DATABASE_URL`, `KAPSO_API_KEY`, `KAPSO_WEBHOOK_SECRET`, `OPENAI_API_KEY`, and `TRIGGER_SECRET_KEY`.
 - `KAPSO_API_BASE_URL` is optional; `src/lib/whatsapp.ts` defaults to `https://api.kapso.ai`.
 - Do not read or print `.env`; it exists locally and may contain real secrets.
 
@@ -28,7 +29,8 @@ This repo uses Next.js `16.2.9`; APIs, conventions, and file structure may diffe
 - The webhook verifies `x-webhook-signature`, ignores non-`whatsapp.message.received` events, normalizes payload envelopes, deduplicates by `kapsoMessageId`, stores inbound media in Vercel Blob, then triggers Trigger.dev task `process-whatsapp-badge`.
 - Trigger.dev tasks are discovered from `src/trigger` by `trigger.config.ts`; `sharp` is externalized there because badge rendering depends on it.
 - Badge generation flow is `process-whatsapp-badge` -> `generate-profile-badge` -> `generate-pixel-art-image` -> `generate-badge`.
-- Drizzle schema is in `src/db/schema.ts`; badge numbers currently mirror the conversation id in `ensureBadgeNumber`.
+- Drizzle schema is in `src/db/schema.ts`; `ensureBadgeNumber` assigns the lowest available positive integer and retries on unique-index conflicts.
+- `/badges` and `/badges/[page]` render the generated badge wall from `whatsapp_conversations` where badge generation is complete.
 - Shared imports use the `@/*` alias to `src/*`.
 
 ## Repo Quirks
