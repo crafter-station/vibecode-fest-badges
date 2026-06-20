@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { whatsappConversations } from "@/db/schema";
+import { upsertCanonicalWhatsappBadge } from "@/lib/badges";
 import {
   generateFailureReply,
   sendWhatsAppImage,
@@ -112,6 +113,11 @@ export const processWhatsAppBadgeTask = schemaTask({
           updatedAt: new Date(),
         })
         .where(eq(whatsappConversations.id, conversationId));
+      await upsertCanonicalWhatsappBadge({
+        conversationId,
+        pixelArtImageUrl: result.output.pixelArtImageUrl,
+        badgeImageUrl: result.output.badgeImageUrl,
+      });
 
       const imageCaption =
         "Tu badge de VibeCode Fest ya está listo. Guárdalo y compártelo en Instagram, LinkedIn o X para que tus amigos también puedan venir.";

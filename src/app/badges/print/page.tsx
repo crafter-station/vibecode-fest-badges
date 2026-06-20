@@ -1,9 +1,9 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, inArray, isNotNull } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { db } from "@/db";
-import { whatsappConversations } from "@/db/schema";
+import { badges as badgesTable } from "@/db/schema";
 import { PrintButton } from "./print-button";
 
 type PageProps = {
@@ -14,8 +14,8 @@ type PageProps = {
 
 type PrintableBadge = {
   id: number;
-  badgeNumber: number | null;
-  badgeImageUrl: string | null;
+  badgeNumber: number;
+  badgeImageUrl: string;
 };
 
 export const metadata: Metadata = {
@@ -56,17 +56,15 @@ export default async function Page({ searchParams }: PageProps) {
     selectedIds.length > 0
       ? await db
           .select({
-            id: whatsappConversations.id,
-            badgeNumber: whatsappConversations.badgeNumber,
-            badgeImageUrl: whatsappConversations.badgeImageUrl,
+            id: badgesTable.id,
+            badgeNumber: badgesTable.badgeNumber,
+            badgeImageUrl: badgesTable.badgeImageUrl,
           })
-          .from(whatsappConversations)
+          .from(badgesTable)
           .where(
             and(
-              inArray(whatsappConversations.id, selectedIds),
-              eq(whatsappConversations.badgeGenerated, true),
-              isNotNull(whatsappConversations.badgeImageUrl),
-              isNotNull(whatsappConversations.badgeNumber),
+              inArray(badgesTable.id, selectedIds),
+              isNotNull(badgesTable.badgeImageUrl),
             ),
           )
       : [];

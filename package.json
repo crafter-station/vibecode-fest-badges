@@ -8,6 +8,9 @@
     "start": "next start",
     "db:push": "drizzle-kit push",
     "db:push:prod": "bun --env-file=.env.prod run db:push",
+    "backfill:badges": "bun run scripts/backfill-canonical-badges.ts",
+    "backfill:badges:prod": "bun --env-file=.env.prod run backfill:badges",
+    "verify:badges": "bun run scripts/verify-canonical-badges.ts",
     "generate:badge": "bun run scripts/generate-profile-animation.ts",
     "generate:profile-animation": "bun run scripts/generate-profile-animation.ts",
     "generate:badges-video": "bun run scripts/generate-badges-video.ts",
@@ -26,6 +29,7 @@
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.14.0",
     "sharp": "^0.34.5",
     "zod": "^4.4.3"
   },
